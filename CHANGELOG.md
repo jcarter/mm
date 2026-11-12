@@ -4,6 +4,17 @@ All notable changes to mm will be documented in this file.
 
 The format is based loosely on Keep a Changelog, and versions are recorded using repository tags.
 
+## [Unreleased]
+
+### Added
+
+- `mm notify` accepts `--user`, `--message`, `--regex` and `--case-sensitive` to filter events by the post's author and message.
+
+### Fixed
+
+- `mm notify --json` printed `{}` for every event; it now prints the server's event as one compact JSON object per line.
+- `mm notify` exited with `websocket connection closed` whenever the connection dropped. It now reconnects automatically (exponential backoff, 1s up to 30s) when the WebSocket closes or the server stops pinging, reports the cause and `reconnected` on stderr in `--json` mode, and exits with an error if the token is rejected (401) while reconnecting. Events missed while disconnected are not replayed.
+
 ## [0.9.0] - 2026-10-16
 
 ### Added

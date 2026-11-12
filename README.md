@@ -82,7 +82,48 @@ mm notify                          # all events
 mm notify --event posted           # only new messages
 mm notify --channel town-square    # only one channel
 mm notify --json                   # JSON output for scripting
+mm notify --event posted --user jcarter --message '@jcarter' --regex --json
 ```
+
+`--json` prints each event as one compact JSON object per line, exactly as the
+server sent it (`event`, `data`, `broadcast`, `seq`). In `posted` events
+`data.post` is a JSON string; decode it with `jq`:
+
+```bash
+mm notify --event posted --json | jq -c '.data.post |= fromjson'
+```
+
+Post filters look at the post carried by the event and combine (AND) with
+`--event` and `--channel`; events without a post are dropped when one is set:
+
+- `--user <username>`: only posts written by this user (leading `@` allowed)
+- `--message <text>`: only posts whose message contains the text (case-insensitive)
+- `--regex`: treat `--message` as a regular expression
+- `--case-sensitive`: match case exactly
+
+`--regex` and `--case-sensitive` require `--message`.
+
+### Reconnection
+
+`mm notify` is meant to run unattended. When the WebSocket closes (network drop,
+laptop sleep, proxy idle timeout, server restart) or the server stops sending
+pings, it reconnects automatically with exponential backoff (1s, 2s, 4s, ...
+capped at 30s; the backoff restarts after each successful reconnect). Before
+every attempt it checks the token with an authenticated request: if the server
+answers 401 (token revoked or expired) `mm notify` exits with an error instead
+of retrying forever; any other failure is retried. The first connection is not
+retried, so a wrong URL or token is reported immediately.
+
+Status lines go to stderr in `--json` mode (stdout carries only events), and to
+stdout otherwise:
+
+```text
+connection lost: websocket: close 1006 (abnormal closure): unexpected EOF; reconnecting in 1s
+reconnected
+```
+
+Events that occur while disconnected are not replayed; anything posted during
+the gap is missed. Filters and name caches are kept across reconnects.
 
 ## Usage
 
@@ -515,7 +556,7 @@ The following Mattermost REST API (v4) endpoint groups are fully supported:
 | **Sessions** | `auth` | List sessions, revoke session, revoke all |
 | **Access tokens** | `auth` | Create, list, revoke personal access tokens |
 | **Server** | `server` | Ping with status, client config/server info |
-| **WebSocket** | `notify` | Real-time event streaming with event type and channel filters |
+| **WebSocket** | `notify` | Real-time event streaming with event type, channel, user and message filters |
 | **Archive** | `archive` | Incremental local archive of posts and attachments, offline search, status |
 | **Authentication** | `auth` | Login (token or password), multi-profile management |
 
